@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Waste Detection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .camera-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .camera-container {
+            position: relative;
+            display: inline-block;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        #video {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            border-radius: 15px;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.classify {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+        }
+
+        .btn.auto {
+            background: linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%);
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .control-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+
+        .control-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .results {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .result-label {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .result-value {
+            color: #666;
+        }
+
+        .dry-waste {
+            color: #2E7D32;
+            background: #E8F5E8;
+        }
+
+        .wet-waste {
+            color: #8D6E63;
+            background: #F3E5AB;
+        }
+
+        .stats-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 5px solid #FF6B6B;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .btn {
+                padding: 10px 20px;
+                font-size: 0.9em;
+                margin: 5px;
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗑️ Live Waste Detection System</h1>
+            <p>AI-powered real-time waste classification using your webcam</p>
+        </div>
+
+        <div class="main-content">
+            <div class="camera-section">
+                <h2>Live Camera Feed</h2>
+                <div class="camera-container">
+                    <video id="video" autoplay muted></video>
+                    <div class="camera-overlay" id="cameraStatus">Camera Loading...</div>
+                </div>
+                
+                <div class="controls">
+                    <button id="startBtn" class="btn">Start Camera</button>
+                    <button id="stopBtn" class="btn" disabled>Stop Camera</button>
+                    <button id="classifyBtn" class="btn classify" disabled>Classify Now</button>
+                    <button id="captureBtn" class="btn" disabled>Capture Image</button>
+                </div>
+            </div>
+
+            <div class="control-panel">
+                <div class="control-section">
+                    <h3>Auto Classification</h3>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoClassify" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <span>Auto-classify every 3 seconds</span>
+                    </div>
+                </div>
+
+                <div class="results">
+                    <h3>🔍 Classification Results</h3>
+                    <div class="result-item">
+                        <span class="result-label">Waste Type:</span>
+                        <span class="result-value" id="wasteType">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Confidence:</span>
+                        <span class="result-value" id="confidence">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Processing Time:</span>
+                        <span class="result-value" id="processingTime">--</span>
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Last Updated:</span>
+                        <span class="result-value" id="lastUpdated">--</span>
+                    </div>
+                </div>
+
+                <div class="stats-section">
+                    <h3>📊 Statistics</h3>
+                    <div class="stat-item">
+                        <span>Total Classifications:</span>
+                        <span id="totalCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Dry Waste:</span>
+                        <span id="dryCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span>Wet Waste:</span>
+                        <span id="wetCount">0</span>
+                    </div>
+                    <button id="statsBtn" class="btn">View Detailed Stats</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="status info">
+            Ready to start - Click "Start Camera" to begin
+        </div>
+    </div>
+
+    <script>
+        let video = null;
+        let canvas = null;
+        let stream = null;
+        let isAutoClassifying = false;
+        let autoClassifyInterval = null;
+        let classificationCount = 0;
+        let dryWasteCount = 0;
+        let wetWasteCount = 0;
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeElements();
+            setupEventListeners();
+            loadStats();
+        });
+
+        function initializeElements() {
+            video = document.getElementById('video');
+            canvas = document.createElement('canvas');
+            canvas.style.display = 'none';
+            document.body.appendChild(canvas);
+        }
+
+        function setupEventListeners() {
+            document.getElementById('startBtn').addEventListener('click', startCamera);
+            document.getElementById('stopBtn').addEventListener('click', stopCamera);
+            document.getElementById('classifyBtn').addEventListener('click', classifyNow);
+            document.getElementById('captureBtn').addEventListener('click', captureImage);
+            document.getElementById('autoClassify').addEventListener('change', toggleAutoClassify);
+            document.getElementById('statsBtn').addEventListener('click', showDetailedStats);
+        }
+
+        async function startCamera() {
+            try {
+                updateStatus('Requesting camera access...', 'info');
+                
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                video.srcObject = stream;
+                
+                // Update UI
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                document.getElementById('classifyBtn').disabled = false;
+                document.getElementById('captureBtn').disabled = false;
+                
+                document.getElementById('cameraStatus').textContent = 'Camera Active';
+                updateStatus('Camera started successfully! Show waste items to classify.', 'success');
+                
+                // Start auto-classification if enabled
+                if (document.getElementById('autoClassify').checked) {
+                    startAutoClassification();
+                }
+                
+            } catch (error) {
+                console.error('Camera access error:', error);
+                updateStatus('Camera access denied. Please allow camera permissions and try again.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (autoClassifyInterval) {
+                clearInterval(autoClassifyInterval);
+                autoClassifyInterval = null;
+            }
+            
+            // Update UI
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('classifyBtn').disabled = true;
+            document.getElementById('captureBtn').disabled = true;
+            
+            document.getElementById('cameraStatus').textContent = 'Camera Stopped';
+            updateStatus('Camera stopped', 'info');
+        }
+
+        function toggleAutoClassify() {
+            const isChecked = document.getElementById('autoClassify').checked;
+            
+            if (isChecked && stream) {
+                startAutoClassification();
+            } else {
+                stopAutoClassification();
+            }
+        }
+
+        function startAutoClassification() {
+            if (autoClassifyInterval) return;
+            
+            autoClassifyInterval = setInterval(() => {
+                if (stream) {
+                    classifyCurrentFrame();
+                }
+            }, 3000); // Every 3 seconds
+            
+            updateStatus('Auto-classification enabled - detecting every 3 seconds', 'success');
+        }
+
+        function stopAutoClassification() {
+            if (autoClassifyInterval) {
+                clearInterval(autoClassifyInterval);
+                autoClassifyInterval = null;
+            }
+            updateStatus('Auto-classification disabled', 'info');
+        }
+
+        function classifyNow() {
+            if (stream) {
+                classifyCurrentFrame();
+            }
+        }
+
+        function classifyCurrentFrame() {
+            if (!video || !stream) return;
+            
+            // Show loading
+            document.getElementById('wasteType').innerHTML = '<div class="loading"></div>';
+            
+            // Capture frame from video
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            // Convert to base64
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // Send to server for classification
+            fetch('/classify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    image: imageData
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateResults(data);
+                    updateCounts(data);
+                    updateStatus(`Classified as ${data.waste_type} (${(data.confidence * 100).toFixed(1)}%)`, 'success');
+                } else {
+                    updateStatus('Classification failed: ' + data.error, 'error');
+                    document.getElementById('wasteType').textContent = 'Error';
+                }
+            })
+            .catch(error => {
+                console.error('Classification error:', error);
+                updateStatus('Classification error: ' + error.message, 'error');
+                document.getElementById('wasteType').textContent = 'Error';
+            });
+        }
+
+        function updateResults(data) {
+            const wasteTypeElement = document.getElementById('wasteType');
+            wasteTypeElement.textContent = data.waste_type;
+            
+            // Apply color coding
+            wasteTypeElement.className = 'result-value ' + (data.waste_type === 'Dry Waste' ? 'dry-waste' : 'wet-waste');
+            
+            document.getElementById('confidence').textContent = (data.confidence * 100).toFixed(1) + '%';
+            document.getElementById('processingTime').textContent = data.processing_time.toFixed(3) + 's';
+            document.getElementById('lastUpdated').textContent = data.timestamp;
+        }
+
+        function updateCounts(data) {
+            classificationCount = data.count;
+            document.getElementById('totalCount').textContent = classificationCount;
+            
+            // Update waste type counts (would need to be tracked separately)
+            if (data.waste_type === 'Dry Waste') {
+                dryWasteCount++;
+            } else {
+                wetWasteCount++;
+            }
+            
+            document.getElementById('dryCount').textContent = dryWasteCount;
+            document.getElementById('wetCount').textContent = wetWasteCount;
+        }
+
+        function captureImage() {
+            if (!video || !stream) return;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            // Create download link
+            const link = document.createElement('a');
+            link.download = 'waste_capture_' + new Date().toISOString().slice(0, 19).replace(/:/g, '-') + '.jpg';
+            link.href = canvas.toDataURL('image/jpeg', 0.9);
+            link.click();
+            
+            updateStatus('Image captured and downloaded', 'success');
+        }
+
+        function showDetailedStats() {
+            fetch('/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let statsHtml = '<h3>Detailed Statistics</h3>';
+                    statsHtml += '<p><strong>Total Classifications:</strong> ' + data.total_count + '</p>';
+                    
+                    if (data.stats) {
+                        statsHtml += '<h4>Breakdown:</h4>';
+                        for (let wasteType in data.stats) {
+                            const stat = data.stats[wasteType];
+                            statsHtml += '<p><strong>' + wasteType + ':</strong> ' + stat.count + ' classifications (avg confidence: ' + (stat.avg_confidence * 100).toFixed(1) + '%)</p>';
+                        }
+                    }
+                    
+                    if (data.recent && data.recent.length > 0) {
+                        statsHtml += '<h4>Recent Classifications:</h4>';
+                        statsHtml += '<ul>';
+                        data.recent.forEach(item => {
+                            statsHtml += '<li>' + item[0] + ': ' + item[1] + ' (' + (item[2] * 100).toFixed(1) + '%)</li>';
+                        });
+                        statsHtml += '</ul>';
+                    }
+                    
+                    // Create popup window
+                    const popup = window.open('', 'Stats', 'width=600,height=400');
+                    popup.document.write('<html><head><title>Statistics</title></head><body style="font-family: Arial; padding: 20px;">' + statsHtml + '</body></html>');
+                }
+            })
+            .catch(error => {
+                console.error('Stats error:', error);
+                updateStatus('Failed to load statistics', 'error');
+            });
+        }
+
+        function loadStats() {
+            fetch('/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    classificationCount = data.total_count || 0;
+                    document.getElementById('totalCount').textContent = classificationCount;
+                    
+                    if (data.stats) {
+                        dryWasteCount = data.stats['Dry Waste'] ? data.stats['Dry Waste'].count : 0;
+                        wetWasteCount = data.stats['Wet Waste'] ? data.stats['Wet Waste'].count : 0;
+                        
+                        document.getElementById('dryCount').textContent = dryWasteCount;
+                        document.getElementById('wetCount').textContent = wetWasteCount;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Failed to load stats:', error);
+            });
+        }
+
+        function updateStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = 'status ' + type;
+        }
+    </script>
+</body>
+</html>

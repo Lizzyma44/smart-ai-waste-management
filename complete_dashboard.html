@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Waste Management Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        .panel h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel h3 {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        /* Header */
+        .header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #2E7D32 0%, #4CAF50 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        /* Loading Section */
+        .loading-panel {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Camera Section */
+        .camera-panel {
+            grid-column: 1 / -1;
+        }
+
+        .camera-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        #video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .detection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        .camera-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.primary {
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+        }
+
+        .btn.danger {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF4757 100%);
+        }
+
+        .btn.warning {
+            background: linear-gradient(135deg, #FFA726 0%, #FF9800 100%);
+        }
+
+        /* Current Detection Panel */
+        .detection-result {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 5px solid #4CAF50;
+        }
+
+        .detection-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+        }
+
+        .detection-label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .detection-value {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .dry-waste {
+            color: #2E7D32 !important;
+            background: #E8F5E8 !important;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+        .wet-waste {
+            color: #8D6E63 !important;
+            background: #F3E5AB !important;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+        /* Statistics Panel */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* AI Predictions Panel */
+        .predictions-list {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .prediction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid #2196F3;
+        }
+
+        .prediction-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .prediction-confidence {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* Recent Detections Panel */
+        .recent-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .recent-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .recent-object {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .recent-time {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        /* Settings Panel */
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* Charts */
+        .chart-container {
+            position: relative;
+            height: 200px;
+            margin-top: 15px;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status-bar.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-bar.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-bar.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        /* Model Info */
+        .model-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+            margin-bottom: 15px;
+        }
+
+        .model-info h4 {
+            color: #1976D2;
+            margin-bottom: 10px;
+        }
+
+        .model-info ul {
+            margin-left: 20px;
+        }
+
+        .model-info li {
+            margin-bottom: 5px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: 10px;
+                gap: 10px;
+            }
+            
+            .panel {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 200px;
+            }
+        }
+
+        /* Animations */
+        .detection-animation {
+            animation: pulse 0.5s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Back to Camera Link */
+        .back-to-camera-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .back-to-camera-link:hover {
+            background: linear-gradient(135deg, #66BB6A, #388E3C);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="panel header">
+            <h1>🤖 Smart Waste Management System</h1>
+            <p>AI-powered real-time waste detection and classification dashboard</p>
+        </div>
+
+        <!-- Loading Section -->
+        <div id="loadingPanel" class="panel loading-panel">
+            <div class="loading-spinner"></div>
+            <h3>Loading AI Models...</h3>
+            <p id="loadingText">Initializing TensorFlow.js and MobileNet...</p>
+            <div class="model-info">
+                <h4>🧠 AI Models Being Loaded:</h4>
+                <ul>
+                    <li><strong>MobileNet:</strong> 1000+ object classification</li>
+                    <li><strong>COCO-SSD:</strong> Real-time object detection</li>
+                    <li><strong>Custom Logic:</strong> Waste category classification</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Camera Panel -->
+        <div id="cameraPanel" class="panel camera-panel" style="display: none;">
+            <h2>🎥 Live Camera Feed</h2>
+            <div class="camera-container">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="detectionCanvas" class="detection-overlay"></canvas>
+                <div class="camera-status" id="cameraStatus">Click Start Camera</div>
+            </div>
+            <div class="controls">
+                <button id="startBtn" class="btn primary">🎥 Start Camera</button>
+                <button id="stopBtn" class="btn danger" disabled>⏹️ Stop Camera</button>
+                <button id="detectBtn" class="btn warning" disabled>🔍 Detect Now</button>
+                <button id="captureBtn" class="btn" disabled>📸 Capture</button>
+            </div>
+        </div>
+
+        <!-- Current Detection Panel -->
+        <div id="detectionPanel" class="panel" style="display: none;">
+            <h2>🎯 Current Detection</h2>
+            <div class="detection-result" id="detectionResult">
+                <div class="detection-item">
+                    <span class="detection-label">Detected Object:</span>
+                    <span class="detection-value" id="detectedObject">--</span>
+                </div>
+                <div class="detection-item">
+                    <span class="detection-label">Waste Category:</span>
+                    <span class="detection-value" id="wasteCategory">--</span>
+                </div>
+                <div class="detection-item">
+                    <span class="detection-label">AI Confidence:</span>
+                    <span class="detection-value" id="aiConfidence">--</span>
+                </div>
+                <div class="detection-item">
+                    <span class="detection-label">Processing Time:</span>
+                    <span class="detection-value" id="processingTime">--</span>
+                </div>
+            </div>
+            
+            <h3>🤖 AI Predictions</h3>
+            <div class="predictions-list" id="predictionsList">
+                <div class="prediction-item">
+                    <span class="prediction-name">No predictions yet</span>
+                    <span class="prediction-confidence">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Panel -->
+        <div id="statisticsPanel" class="panel" style="display: none;">
+            <h2>📊 Real-time Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalDetections">0</div>
+                    <div class="stat-label">Total Detections</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="dryCount">0</div>
+                    <div class="stat-label">Dry Waste</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="wetCount">0</div>
+                    <div class="stat-label">Wet Waste</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgConfidence">--</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+            </div>
+            
+            <h3>📈 Detection Chart</h3>
+            <div class="chart-container">
+                <canvas id="detectionChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Detections Panel -->
+        <div id="recentPanel" class="panel" style="display: none;">
+            <h2>📋 Recent Detections</h2>
+            <div class="recent-list" id="recentList">
+                <div class="recent-item">
+                    <div>
+                        <div class="recent-object">No detections yet</div>
+                        <div class="recent-time">Start camera to begin</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div id="settingsPanel" class="panel" style="display: none;">
+            <h2>⚙️ Settings</h2>
+            <div class="settings-item">
+                <span>Auto Detection</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoDetect" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="settings-item">
+                <span>Show Bounding Boxes</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="showBoundingBoxes" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="settings-item">
+                <span>Sound Alerts</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="soundAlerts">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="settings-item">
+                <span>Save Images</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="saveImages" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <h3>📊 Export Data</h3>
+            <div class="controls">
+                <button id="exportBtn" class="btn">📄 Export CSV</button>
+                <button id="clearBtn" class="btn danger">🗑️ Clear Data</button>
+            </div>
+        </div>
+
+        <!-- System Info Panel -->
+        <div id="systemPanel" class="panel" style="display: none;">
+            <h2>💻 System Information</h2>
+            <div class="detection-item">
+                <span class="detection-label">Browser:</span>
+                <span class="detection-value" id="browserInfo">--</span>
+            </div>
+            <div class="detection-item">
+                <span class="detection-label">Camera Resolution:</span>
+                <span class="detection-value" id="cameraResolution">--</span>
+            </div>
+            <div class="detection-item">
+                <span class="detection-label">AI Model Status:</span>
+                <span class="detection-value" id="modelStatus">--</span>
+            </div>
+            <div class="detection-item">
+                <span class="detection-label">Performance:</span>
+                <span class="detection-value" id="performanceInfo">--</span>
+            </div>
+            <div class="detection-item">
+                <span class="detection-label">Memory Usage:</span>
+                <span class="detection-value" id="memoryInfo">--</span>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div id="statusBar" class="status-bar info">
+            Loading AI models... Please wait.
+        </div>
+    </div>
+
+    <!-- Back to Camera Link -->
+    <a href="minimal_glassmorphism.html" class="back-to-camera-link">
+        🎥 Back to Camera
+    </a>
+
+    <script>
+        // Global variables
+        let video = null;
+        let detectionCanvas = null;
+        let detectionCtx = null;
+        let stream = null;
+        let mobileNetModel = null;
+        let cocoSsdModel = null;
+        let isDetecting = false;
+        let autoDetectInterval = null;
+        let detectionChart = null;
+        
+        // Statistics
+        let totalDetections = 0;
+        let dryWasteCount = 0;
+        let wetWasteCount = 0;
+        let totalConfidence = 0;
+        let recentDetections = [];
+        let detectionHistory = [];
+
+        // Waste classification mapping
+        const wasteClassification = {
+            // Wet/Organic Waste
+            'banana': 'wet', 'apple': 'wet', 'orange': 'wet', 'broccoli': 'wet', 'carrot': 'wet',
+            'hot dog': 'wet', 'pizza': 'wet', 'donut': 'wet', 'cake': 'wet', 'avocado': 'wet',
+            'lemon': 'wet', 'sandwich': 'wet', 'food': 'wet', 'fruit': 'wet', 'vegetable': 'wet',
+            
+            // Dry/Recyclable Waste
+            'bottle': 'dry', 'wine glass': 'dry', 'cup': 'dry', 'knife': 'dry', 'spoon': 'dry',
+            'bowl': 'dry', 'cell phone': 'dry', 'laptop': 'dry', 'mouse': 'dry', 'keyboard': 'dry',
+            'book': 'dry', 'scissors': 'dry', 'can': 'dry', 'plastic': 'dry', 'glass': 'dry',
+            'metal': 'dry', 'paper': 'dry', 'cardboard': 'dry', 'aluminum': 'dry'
+        };
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadAIModels();
+            initializeElements();
+            setupEventListeners();
+            initializeChart();
+            updateSystemInfo();
+        });
+
+        async function loadAIModels() {
+            try {
+                updateStatus('🧠 Loading AI Models... This may take a moment.', 'info');
+                
+                // Load MobileNet
+                document.getElementById('loadingText').textContent = 'Loading MobileNet (Image Classification)...';
+                mobileNetModel = await mobilenet.load();
+                
+                // Load COCO-SSD
+                document.getElementById('loadingText').textContent = 'Loading COCO-SSD (Object Detection)...';
+                cocoSsdModel = await cocoSsd.load();
+                
+                // Hide loading and show panels
+                document.getElementById('loadingPanel').style.display = 'none';
+                document.getElementById('cameraPanel').style.display = 'block';
+                document.getElementById('detectionPanel').style.display = 'block';
+                document.getElementById('statisticsPanel').style.display = 'block';
+                document.getElementById('recentPanel').style.display = 'block';
+                document.getElementById('settingsPanel').style.display = 'block';
+                document.getElementById('systemPanel').style.display = 'block';
+                
+                // Add fade-in animation
+                document.querySelectorAll('.panel').forEach(panel => {
+                    panel.classList.add('fade-in');
+                });
+                
+                updateStatus('✅ AI Models loaded successfully! Ready for waste detection.', 'success');
+                
+            } catch (error) {
+                console.error('Error loading AI models:', error);
+                updateStatus('❌ Failed to load AI models. Please refresh the page.', 'error');
+            }
+        }
+
+        function initializeElements() {
+            video = document.getElementById('video');
+            detectionCanvas = document.getElementById('detectionCanvas');
+            detectionCtx = detectionCanvas.getContext('2d');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('startBtn').addEventListener('click', startCamera);
+            document.getElementById('stopBtn').addEventListener('click', stopCamera);
+            document.getElementById('detectBtn').addEventListener('click', detectNow);
+            document.getElementById('captureBtn').addEventListener('click', captureImage);
+            document.getElementById('autoDetect').addEventListener('change', toggleAutoDetect);
+            document.getElementById('showBoundingBoxes').addEventListener('change', toggleBoundingBoxes);
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+            document.getElementById('clearBtn').addEventListener('click', clearData);
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.code === 'Space' && !e.target.matches('input, textarea, button')) {
+                    e.preventDefault();
+                    detectNow();
+                }
+            });
+        }
+
+        function initializeChart() {
+            const ctx = document.getElementById('detectionChart').getContext('2d');
+            detectionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Dry Waste', 'Wet Waste'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: ['#2E7D32', '#8D6E63'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+
+        async function startCamera() {
+            try {
+                updateStatus('🎥 Starting camera...', 'info');
+                
+                const constraints = {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'environment'
+                    }
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    
+                    // Setup detection canvas
+                    detectionCanvas.width = video.videoWidth;
+                    detectionCanvas.height = video.videoHeight;
+                    detectionCanvas.style.width = video.offsetWidth + 'px';
+                    detectionCanvas.style.height = video.offsetHeight + 'px';
+                    
+                    // Update UI
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    document.getElementById('detectBtn').disabled = false;
+                    document.getElementById('captureBtn').disabled = false;
+                    
+                    document.getElementById('cameraStatus').textContent = '🟢 AI Detection Active';
+                    document.getElementById('cameraResolution').textContent = `${video.videoWidth}x${video.videoHeight}`;
+                    
+                    updateStatus('✅ Camera started! Show items for AI detection.', 'success');
+                    
+                    // Start auto-detection if enabled
+                    if (document.getElementById('autoDetect').checked) {
+                        startAutoDetection();
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                updateStatus('❌ Camera access denied. Please allow camera permissions.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (autoDetectInterval) {
+                clearInterval(autoDetectInterval);
+                autoDetectInterval = null;
+            }
+            
+            // Clear detection canvas
+            detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+            
+            // Update UI
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('detectBtn').disabled = true;
+            document.getElementById('captureBtn').disabled = true;
+            
+            document.getElementById('cameraStatus').textContent = '🔴 Camera Stopped';
+            updateStatus('📱 Camera stopped', 'info');
+        }
+
+        function toggleAutoDetect() {
+            const isChecked = document.getElementById('autoDetect').checked;
+            
+            if (isChecked && stream) {
+                startAutoDetection();
+            } else {
+                stopAutoDetection();
+            }
+        }
+
+        function startAutoDetection() {
+            if (autoDetectInterval) return;
+            
+            autoDetectInterval = setInterval(() => {
+                if (stream && !isDetecting) {
+                    detectCurrentFrame();
+                }
+            }, 2000);
+            
+            updateStatus('🔄 Auto-detection enabled - AI analyzing every 2 seconds', 'success');
+        }
+
+        function stopAutoDetection() {
+            if (autoDetectInterval) {
+                clearInterval(autoDetectInterval);
+                autoDetectInterval = null;
+            }
+            updateStatus('⏸️ Auto-detection disabled', 'info');
+        }
+
+        function detectNow() {
+            if (stream && !isDetecting) {
+                detectCurrentFrame();
+            }
+        }
+
+        async function detectCurrentFrame() {
+            if (!video || !stream || isDetecting || !mobileNetModel || !cocoSsdModel) return;
+            
+            isDetecting = true;
+            const startTime = performance.now();
+            
+            try {
+                // Show loading
+                document.getElementById('detectedObject').textContent = 'Analyzing...';
+                document.getElementById('wasteCategory').textContent = 'Processing...';
+                
+                // Add animation
+                document.getElementById('detectionResult').classList.add('detection-animation');
+                
+                // Clear previous detections
+                if (document.getElementById('showBoundingBoxes').checked) {
+                    detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+                }
+                
+                // Run AI models
+                const [classifications, detections] = await Promise.all([
+                    mobileNetModel.classify(video),
+                    cocoSsdModel.detect(video)
+                ]);
+                
+                const processingTime = (performance.now() - startTime) / 1000;
+                
+                // Process results
+                const result = processAIResults(classifications, detections, processingTime);
+                
+                // Draw detection boxes
+                if (document.getElementById('showBoundingBoxes').checked) {
+                    drawDetections(detections);
+                }
+                
+                // Update UI
+                updateResults(result);
+                updateStatistics(result);
+                addRecentDetection(result);
+                
+                // Play sound if enabled
+                if (document.getElementById('soundAlerts').checked) {
+                    playNotificationSound();
+                }
+                
+                updateStatus(`🎯 AI Detected: ${result.detectedObject} (${result.wasteCategory}) - ${(result.confidence * 100).toFixed(1)}%`, 'success');
+                
+            } catch (error) {
+                console.error('Detection error:', error);
+                updateStatus('❌ Detection failed', 'error');
+            } finally {
+                isDetecting = false;
+                document.getElementById('detectionResult').classList.remove('detection-animation');
+            }
+        }
+
+        function processAIResults(classifications, detections, processingTime) {
+            // Get the top classification
+            const topClassification = classifications[0];
+            let detectedObject = topClassification.className;
+            let confidence = topClassification.probability;
+            
+            // If we have object detections, prefer those
+            if (detections.length > 0) {
+                const topDetection = detections.reduce((prev, current) => 
+                    (prev.score > current.score) ? prev : current
+                );
+                detectedObject = topDetection.class;
+                confidence = topDetection.score;
+            }
+            
+            // Determine waste category
+            let wasteCategory = 'Unknown';
+            
+            if (wasteClassification[detectedObject]) {
+                wasteCategory = wasteClassification[detectedObject] === 'wet' ? 'Wet Waste' : 'Dry Waste';
+            } else {
+                const objectLower = detectedObject.toLowerCase();
+                for (const [key, value] of Object.entries(wasteClassification)) {
+                    if (objectLower.includes(key) || key.includes(objectLower)) {
+                        wasteCategory = value === 'wet' ? 'Wet Waste' : 'Dry Waste';
+                        break;
+                    }
+                }
+                
+                if (wasteCategory === 'Unknown') {
+                    const wetKeywords = ['food', 'fruit', 'vegetable', 'organic', 'eat'];
+                    const dryKeywords = ['bottle', 'can', 'glass', 'plastic', 'metal', 'paper'];
+                    
+                    if (wetKeywords.some(keyword => objectLower.includes(keyword))) {
+                        wasteCategory = 'Wet Waste';
+                    } else if (dryKeywords.some(keyword => objectLower.includes(keyword))) {
+                        wasteCategory = 'Dry Waste';
+                    } else {
+                        wasteCategory = 'Dry Waste';
+                    }
+                }
+            }
+            
+            return {
+                detectedObject: detectedObject,
+                wasteCategory: wasteCategory,
+                confidence: confidence,
+                processingTime: processingTime,
+                allClassifications: classifications,
+                allDetections: detections,
+                timestamp: new Date()
+            };
+        }
+
+        function drawDetections(detections) {
+            detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+            
+            detections.forEach(detection => {
+                const [x, y, width, height] = detection.bbox;
+                
+                // Draw bounding box
+                detectionCtx.strokeStyle = '#4CAF50';
+                detectionCtx.lineWidth = 3;
+                detectionCtx.strokeRect(x, y, width, height);
+                
+                // Draw label background
+                detectionCtx.fillStyle = '#4CAF50';
+                detectionCtx.fillRect(x, y - 25, width, 25);
+                
+                // Draw label text
+                detectionCtx.fillStyle = 'white';
+                detectionCtx.font = '14px Arial';
+                detectionCtx.fillText(
+                    `${detection.class} (${(detection.score * 100).toFixed(1)}%)`,
+                    x + 5,
+                    y - 8
+                );
+            });
+        }
+
+        function updateResults(result) {
+            document.getElementById('detectedObject').textContent = result.detectedObject;
+            
+            const wasteCategoryElement = document.getElementById('wasteCategory');
+            wasteCategoryElement.textContent = result.wasteCategory;
+            wasteCategoryElement.className = 'detection-value ' + (result.wasteCategory === 'Dry Waste' ? 'dry-waste' : 'wet-waste');
+            
+            document.getElementById('aiConfidence').textContent = (result.confidence * 100).toFixed(1) + '%';
+            document.getElementById('processingTime').textContent = result.processingTime.toFixed(3) + 's';
+            
+            // Update predictions
+            const predictionsList = document.getElementById('predictionsList');
+            predictionsList.innerHTML = '';
+            
+            if (result.allClassifications && result.allClassifications.length > 0) {
+                result.allClassifications.slice(0, 3).forEach(pred => {
+                    const predDiv = document.createElement('div');
+                    predDiv.className = 'prediction-item';
+                    predDiv.innerHTML = `
+                        <span class="prediction-name">${pred.className}</span>
+                        <span class="prediction-confidence">${(pred.probability * 100).toFixed(1)}%</span>
+                    `;
+                    predictionsList.appendChild(predDiv);
+                });
+            }
+        }
+
+        function updateStatistics(result) {
+            totalDetections++;
+            totalConfidence += result.confidence;
+            
+            if (result.wasteCategory === 'Dry Waste') {
+                dryWasteCount++;
+            } else if (result.wasteCategory === 'Wet Waste') {
+                wetWasteCount++;
+            }
+            
+            // Update UI
+            document.getElementById('totalDetections').textContent = totalDetections;
+            document.getElementById('dryCount').textContent = dryWasteCount;
+            document.getElementById('wetCount').textContent = wetWasteCount;
+            document.getElementById('avgConfidence').textContent = ((totalConfidence / totalDetections) * 100).toFixed(1) + '%';
+            
+            // Update chart
+            detectionChart.data.datasets[0].data = [dryWasteCount, wetWasteCount];
+            detectionChart.update();
+            
+            // Store in history
+            detectionHistory.push({
+                timestamp: result.timestamp,
+                object: result.detectedObject,
+                category: result.wasteCategory,
+                confidence: result.confidence
+            });
+        }
+
+        function addRecentDetection(result) {
+            recentDetections.unshift(result);
+            if (recentDetections.length > 10) {
+                recentDetections.pop();
+            }
+            
+            const recentList = document.getElementById('recentList');
+            recentList.innerHTML = '';
+            
+            recentDetections.forEach(detection => {
+                const recentItem = document.createElement('div');
+                recentItem.className = 'recent-item';
+                recentItem.innerHTML = `
+                    <div>
+                        <div class="recent-object">${detection.detectedObject}</div>
+                        <div class="recent-time">${detection.timestamp.toLocaleTimeString()}</div>
+                    </div>
+                    <div class="${detection.wasteCategory === 'Dry Waste' ? 'dry-waste' : 'wet-waste'}">
+                        ${detection.wasteCategory}
+                    </div>
+                `;
+                recentList.appendChild(recentItem);
+            });
+        }
+
+        function toggleBoundingBoxes() {
+            const showBoxes = document.getElementById('showBoundingBoxes').checked;
+            if (!showBoxes) {
+                detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+            }
+        }
+
+        function playNotificationSound() {
+            // Create a simple beep sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        function exportData() {
+            if (detectionHistory.length === 0) {
+                alert('No data to export');
+                return;
+            }
+            
+            const csv = [
+                'Timestamp,Object,Category,Confidence',
+                ...detectionHistory.map(item => 
+                    `${item.timestamp.toISOString()},${item.object},${item.category},${item.confidence}`
+                )
+            ].join('\n');
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `waste_detection_data_${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function clearData() {
+            if (confirm('Are you sure you want to clear all data?')) {
+                totalDetections = 0;
+                dryWasteCount = 0;
+                wetWasteCount = 0;
+                totalConfidence = 0;
+                recentDetections = [];
+                detectionHistory = [];
+                
+                // Reset UI
+                document.getElementById('totalDetections').textContent = '0';
+                document.getElementById('dryCount').textContent = '0';
+                document.getElementById('wetCount').textContent = '0';
+                document.getElementById('avgConfidence').textContent = '--';
+                document.getElementById('recentList').innerHTML = '<div class="recent-item"><div><div class="recent-object">No detections yet</div><div class="recent-time">Start camera to begin</div></div></div>';
+                
+                // Reset chart
+                detectionChart.data.datasets[0].data = [0, 0];
+                detectionChart.update();
+                
+                updateStatus('🗑️ All data cleared', 'info');
+            }
+        }
+
+        function captureImage() {
+            if (!video || !stream) return;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = `waste_detection_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.jpg`;
+            link.href = canvas.toDataURL('image/jpeg', 0.9);
+            link.click();
+            
+            updateStatus('📸 Image captured successfully!', 'success');
+        }
+
+        function updateSystemInfo() {
+            document.getElementById('browserInfo').textContent = navigator.userAgent.split(' ')[0];
+            document.getElementById('modelStatus').textContent = mobileNetModel && cocoSsdModel ? 'Loaded' : 'Loading...';
+            document.getElementById('performanceInfo').textContent = `${navigator.hardwareConcurrency} cores`;
+            
+            if (navigator.deviceMemory) {
+                document.getElementById('memoryInfo').textContent = `${navigator.deviceMemory} GB`;
+            }
+        }
+
+        function updateStatus(message, type) {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = message;
+            statusBar.className = `status-bar ${type}`;
+        }
+
+        // Update performance info every 5 seconds
+        setInterval(() => {
+            if (performance.memory) {
+                const memoryMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1);
+                document.getElementById('memoryInfo').textContent = `${memoryMB} MB`;
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

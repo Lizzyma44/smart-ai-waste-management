@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Waste Detection - Glassmorphism UI</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Animated Background */
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%);
+            animation: backgroundShift 15s ease-in-out infinite;
+        }
+
+        @keyframes backgroundShift {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(180deg); }
+        }
+
+        /* Glassmorphism Card Styles */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 45px 0 rgba(31, 38, 135, 0.5);
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+        }
+
+        .loading-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 30px;
+            padding: 60px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .loading-spinner {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 30px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .loading-details {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1em;
+            font-weight: 300;
+            max-width: 400px;
+        }
+
+        /* Main Container */
+        .main-container {
+            display: grid;
+            grid-template-areas: 
+                "header header header"
+                "controls camera stats"
+                "detection camera recent";
+            grid-template-columns: 300px 1fr 300px;
+            grid-template-rows: auto 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: 100vh;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Header */
+        .header-card {
+            grid-area: header;
+            padding: 20px 40px;
+            text-align: center;
+        }
+
+        .header-title {
+            color: white;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2em;
+            font-weight: 400;
+        }
+
+        /* Camera Section */
+        .camera-card {
+            grid-area: camera;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+
+        .detection-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            bottom: 20px;
+            pointer-events: none;
+        }
+
+        /* Controls Section */
+        .controls-card {
+            grid-area: controls;
+            padding: 30px;
+        }
+
+        .controls-title {
+            color: white;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .control-button {
+            width: 100%;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 15px;
+            color: white;
+            font-size: 1.1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .control-button:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.5);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .control-button.primary {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.8), rgba(46, 125, 50, 0.8));
+        }
+
+        .control-button.danger {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.8), rgba(198, 40, 40, 0.8));
+        }
+
+        .auto-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.3);
+            transition: .4s;
+            border-radius: 30px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(30px);
+        }
+
+        /* Detection Results */
+        .detection-card {
+            grid-area: detection;
+            padding: 30px;
+        }
+
+        .detection-title {
+            color: white;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .detection-result {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        .result-label {
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        .result-value {
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .waste-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .waste-badge.dry {
+            background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            color: white;
+        }
+
+        .waste-badge.wet {
+            background: linear-gradient(135deg, #FF9800, #F57C00);
+            color: white;
+        }
+
+        /* Statistics */
+        .stats-card {
+            grid-area: stats;
+            padding: 30px;
+        }
+
+        .stats-title {
+            color: white;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .stat-number {
+            color: white;
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        /* Recent Detections */
+        .recent-card {
+            grid-area: recent;
+            padding: 30px;
+        }
+
+        .recent-title {
+            color: white;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .recent-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .recent-item {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .recent-object {
+            color: white;
+            font-weight: 600;
+        }
+
+        .recent-time {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.8em;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: 500;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 100;
+        }
+
+        .status-bar.success {
+            background: rgba(76, 175, 80, 0.8);
+        }
+
+        .status-bar.error {
+            background: rgba(244, 67, 54, 0.8);
+        }
+
+        .status-bar.info {
+            background: rgba(33, 150, 243, 0.8);
+        }
+
+        /* Dashboard Link */
+        .dashboard-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 152, 0, 0.8);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .dashboard-link:hover {
+            background: rgba(255, 152, 0, 1);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-areas: 
+                    "header"
+                    "camera"
+                    "controls"
+                    "detection"
+                    "stats"
+                    "recent";
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr auto auto auto;
+            }
+        }
+
+        /* Animations */
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .fade-in {
+            animation: fadeIn 1s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Scrollbar Styling */
+        .recent-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .recent-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        .recent-list::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        .recent-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading AI Models</div>
+            <div class="loading-details" id="loadingDetails">
+                Initializing TensorFlow.js and MobileNet for advanced object recognition...
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div id="mainInterface" class="main-container" style="display: none;">
+        <!-- Header -->
+        <div class="header-card glass-card">
+            <h1 class="header-title">🤖 Smart Waste Detection</h1>
+            <p class="header-subtitle">AI-powered glassmorphism interface for waste classification</p>
+        </div>
+
+        <!-- Camera Section -->
+        <div class="camera-card glass-card">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="detectionCanvas" class="detection-overlay"></canvas>
+            <div class="camera-overlay" id="cameraStatus">Click Start Camera</div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-card glass-card">
+            <h3 class="controls-title">🎮 Controls</h3>
+            <button id="startBtn" class="control-button primary">🎥 Start Camera</button>
+            <button id="stopBtn" class="control-button danger" disabled>⏹️ Stop Camera</button>
+            <button id="detectBtn" class="control-button" disabled>🔍 Detect Now</button>
+            
+            <div class="auto-toggle">
+                <span style="color: white; font-weight: 500;">Auto Detection</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Detection Results -->
+        <div class="detection-card glass-card">
+            <h3 class="detection-title">🎯 Detection Results</h3>
+            <div class="detection-result">
+                <div class="result-item">
+                    <span class="result-label">Detected Object:</span>
+                    <span class="result-value" id="detectedObject">--</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Waste Category:</span>
+                    <span class="result-value">
+                        <span class="waste-badge" id="wasteCategory">--</span>
+                    </span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Confidence:</span>
+                    <span class="result-value" id="confidence">--</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Processing Time:</span>
+                    <span class="result-value" id="processingTime">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-card glass-card">
+            <h3 class="stats-title">📊 Statistics</h3>
+            <div class="stat-item">
+                <div class="stat-number" id="totalDetections">0</div>
+                <div class="stat-label">Total Detections</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="dryCount">0</div>
+                <div class="stat-label">Dry Waste</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="wetCount">0</div>
+                <div class="stat-label">Wet Waste</div>
+            </div>
+        </div>
+
+        <!-- Recent Detections -->
+        <div class="recent-card glass-card">
+            <h3 class="recent-title">📋 Recent Detections</h3>
+            <div class="recent-list" id="recentList">
+                <div class="recent-item">
+                    <div>
+                        <div class="recent-object">No detections yet</div>
+                        <div class="recent-time">Start camera to begin</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Link -->
+    <a href="complete_dashboard.html" class="dashboard-link">
+        📊 Full Dashboard
+    </a>
+
+    <!-- Status Bar -->
+    <div id="statusBar" class="status-bar info">
+        Loading AI models... Please wait.
+    </div>
+
+    <script>
+        // Global variables
+        let video = null;
+        let detectionCanvas = null;
+        let detectionCtx = null;
+        let stream = null;
+        let mobileNetModel = null;
+        let cocoSsdModel = null;
+        let isDetecting = false;
+        let autoDetectInterval = null;
+        let totalDetections = 0;
+        let dryWasteCount = 0;
+        let wetWasteCount = 0;
+        let recentDetections = [];
+
+        // Waste classification mapping
+        const wasteClassification = {
+            // Wet/Organic Waste
+            'banana': 'wet', 'apple': 'wet', 'orange': 'wet', 'broccoli': 'wet', 'carrot': 'wet',
+            'hot dog': 'wet', 'pizza': 'wet', 'donut': 'wet', 'cake': 'wet', 'avocado': 'wet',
+            'lemon': 'wet', 'sandwich': 'wet', 'food': 'wet', 'fruit': 'wet', 'vegetable': 'wet',
+            
+            // Dry/Recyclable Waste
+            'bottle': 'dry', 'wine glass': 'dry', 'cup': 'dry', 'knife': 'dry', 'spoon': 'dry',
+            'bowl': 'dry', 'cell phone': 'dry', 'laptop': 'dry', 'mouse': 'dry', 'keyboard': 'dry',
+            'book': 'dry', 'scissors': 'dry', 'can': 'dry', 'plastic': 'dry', 'glass': 'dry',
+            'metal': 'dry', 'paper': 'dry', 'cardboard': 'dry', 'aluminum': 'dry'
+        };
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            await loadAIModels();
+            initializeElements();
+            setupEventListeners();
+        });
+
+        async function loadAIModels() {
+            try {
+                // Load MobileNet
+                document.getElementById('loadingDetails').textContent = 'Loading MobileNet (Image Classification)...';
+                mobileNetModel = await mobilenet.load();
+                
+                // Load COCO-SSD
+                document.getElementById('loadingDetails').textContent = 'Loading COCO-SSD (Object Detection)...';
+                cocoSsdModel = await cocoSsd.load();
+                
+                // Hide loading screen and show main interface
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('mainInterface').style.display = 'grid';
+                document.getElementById('mainInterface').classList.add('fade-in');
+                
+                updateStatus('✨ AI Models loaded successfully! Ready for waste detection.', 'success');
+                
+            } catch (error) {
+                console.error('Error loading AI models:', error);
+                updateStatus('❌ Failed to load AI models. Please refresh the page.', 'error');
+            }
+        }
+
+        function initializeElements() {
+            video = document.getElementById('video');
+            detectionCanvas = document.getElementById('detectionCanvas');
+            detectionCtx = detectionCanvas.getContext('2d');
+        }
+
+        function setupEventListeners() {
+            document.getElementById('startBtn').addEventListener('click', startCamera);
+            document.getElementById('stopBtn').addEventListener('click', stopCamera);
+            document.getElementById('detectBtn').addEventListener('click', detectNow);
+            document.getElementById('autoToggle').addEventListener('change', toggleAutoDetect);
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.code === 'Space' && !e.target.matches('input, textarea, button')) {
+                    e.preventDefault();
+                    detectNow();
+                }
+            });
+        }
+
+        async function startCamera() {
+            try {
+                updateStatus('🎥 Starting camera...', 'info');
+                
+                const constraints = {
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'environment'
+                    }
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    
+                    // Setup detection canvas
+                    detectionCanvas.width = video.videoWidth;
+                    detectionCanvas.height = video.videoHeight;
+                    detectionCanvas.style.width = '100%';
+                    detectionCanvas.style.height = '100%';
+                    
+                    // Update UI
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    document.getElementById('detectBtn').disabled = false;
+                    
+                    document.getElementById('cameraStatus').textContent = '🟢 Camera Active';
+                    updateStatus('✅ Camera started! Show items for AI detection.', 'success');
+                };
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                updateStatus('❌ Camera access denied. Please allow camera permissions.', 'error');
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (autoDetectInterval) {
+                clearInterval(autoDetectInterval);
+                autoDetectInterval = null;
+                document.getElementById('autoToggle').checked = false;
+            }
+            
+            // Clear detection canvas
+            detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+            
+            // Update UI
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('detectBtn').disabled = true;
+            
+            document.getElementById('cameraStatus').textContent = '🔴 Camera Stopped';
+            updateStatus('📱 Camera stopped', 'info');
+        }
+
+        function toggleAutoDetect() {
+            const isChecked = document.getElementById('autoToggle').checked;
+            
+            if (isChecked && stream) {
+                startAutoDetection();
+            } else {
+                stopAutoDetection();
+            }
+        }
+
+        function startAutoDetection() {
+            if (autoDetectInterval) return;
+            
+            autoDetectInterval = setInterval(() => {
+                if (stream && !isDetecting) {
+                    detectCurrentFrame();
+                }
+            }, 3000);
+            
+            updateStatus('🔄 Auto-detection enabled - AI analyzing every 3 seconds', 'success');
+        }
+
+        function stopAutoDetection() {
+            if (autoDetectInterval) {
+                clearInterval(autoDetectInterval);
+                autoDetectInterval = null;
+            }
+            updateStatus('⏸️ Auto-detection disabled', 'info');
+        }
+
+        function detectNow() {
+            if (stream && !isDetecting) {
+                detectCurrentFrame();
+            }
+        }
+
+        async function detectCurrentFrame() {
+            if (!video || !stream || isDetecting || !mobileNetModel || !cocoSsdModel) return;
+            
+            isDetecting = true;
+            const startTime = performance.now();
+            
+            try {
+                // Show loading state
+                document.getElementById('detectedObject').textContent = 'Analyzing...';
+                document.querySelector('.detection-result').classList.add('pulse-animation');
+                
+                // Run AI models
+                const [classifications, detections] = await Promise.all([
+                    mobileNetModel.classify(video),
+                    cocoSsdModel.detect(video)
+                ]);
+                
+                const processingTime = (performance.now() - startTime) / 1000;
+                
+                // Process results
+                const result = processAIResults(classifications, detections, processingTime);
+                
+                // Update UI
+                updateResults(result);
+                updateStatistics(result);
+                addRecentDetection(result);
+                
+                updateStatus(`🎯 Detected: ${result.detectedObject} → ${result.wasteCategory}`, 'success');
+                
+            } catch (error) {
+                console.error('Detection error:', error);
+                updateStatus('❌ Detection failed', 'error');
+            } finally {
+                isDetecting = false;
+                document.querySelector('.detection-result').classList.remove('pulse-animation');
+            }
+        }
+
+        function processAIResults(classifications, detections, processingTime) {
+            // Get the top classification
+            const topClassification = classifications[0];
+            let detectedObject = topClassification.className;
+            let confidence = topClassification.probability;
+            
+            // If we have object detections, prefer those
+            if (detections.length > 0) {
+                const topDetection = detections.reduce((prev, current) => 
+                    (prev.score > current.score) ? prev : current
+                );
+                detectedObject = topDetection.class;
+                confidence = topDetection.score;
+            }
+            
+            // Determine waste category
+            let wasteCategory = 'Unknown';
+            
+            if (wasteClassification[detectedObject]) {
+                wasteCategory = wasteClassification[detectedObject] === 'wet' ? 'Wet Waste' : 'Dry Waste';
+            } else {
+                const objectLower = detectedObject.toLowerCase();
+                for (const [key, value] of Object.entries(wasteClassification)) {
+                    if (objectLower.includes(key) || key.includes(objectLower)) {
+                        wasteCategory = value === 'wet' ? 'Wet Waste' : 'Dry Waste';
+                        break;
+                    }
+                }
+                
+                if (wasteCategory === 'Unknown') {
+                    const wetKeywords = ['food', 'fruit', 'vegetable', 'organic', 'eat'];
+                    const dryKeywords = ['bottle', 'can', 'glass', 'plastic', 'metal', 'paper'];
+                    
+                    if (wetKeywords.some(keyword => objectLower.includes(keyword))) {
+                        wasteCategory = 'Wet Waste';
+                    } else if (dryKeywords.some(keyword => objectLower.includes(keyword))) {
+                        wasteCategory = 'Dry Waste';
+                    } else {
+                        wasteCategory = 'Dry Waste';
+                    }
+                }
+            }
+            
+            return {
+                detectedObject: detectedObject,
+                wasteCategory: wasteCategory,
+                confidence: confidence,
+                processingTime: processingTime,
+                timestamp: new Date()
+            };
+        }
+
+        function updateResults(result) {
+            document.getElementById('detectedObject').textContent = result.detectedObject;
+            
+            const wasteCategoryElement = document.getElementById('wasteCategory');
+            wasteCategoryElement.textContent = result.wasteCategory;
+            wasteCategoryElement.className = 'waste-badge ' + (result.wasteCategory === 'Dry Waste' ? 'dry' : 'wet');
+            
+            document.getElementById('confidence').textContent = (result.confidence * 100).toFixed(1) + '%';
+            document.getElementById('processingTime').textContent = result.processingTime.toFixed(3) + 's';
+        }
+
+        function updateStatistics(result) {
+            totalDetections++;
+            
+            if (result.wasteCategory === 'Dry Waste') {
+                dryWasteCount++;
+            } else if (result.wasteCategory === 'Wet Waste') {
+                wetWasteCount++;
+            }
+            
+            document.getElementById('totalDetections').textContent = totalDetections;
+            document.getElementById('dryCount').textContent = dryWasteCount;
+            document.getElementById('wetCount').textContent = wetWasteCount;
+        }
+
+        function addRecentDetection(result) {
+            recentDetections.unshift(result);
+            if (recentDetections.length > 5) {
+                recentDetections.pop();
+            }
+            
+            const recentList = document.getElementById('recentList');
+            recentList.innerHTML = '';
+            
+            recentDetections.forEach(detection => {
+                const recentItem = document.createElement('div');
+                recentItem.className = 'recent-item fade-in';
+                recentItem.innerHTML = `
+                    <div>
+                        <div class="recent-object">${detection.detectedObject}</div>
+                        <div class="recent-time">${detection.timestamp.toLocaleTimeString()}</div>
+                    </div>
+                    <div class="waste-badge ${detection.wasteCategory === 'Dry Waste' ? 'dry' : 'wet'}">
+                        ${detection.wasteCategory}
+                    </div>
+                `;
+                recentList.appendChild(recentItem);
+            });
+        }
+
+        function updateStatus(message, type) {
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = message;
+            statusBar.className = `status-bar ${type}`;
+        }
+    </script>
+</body>
+</html>
