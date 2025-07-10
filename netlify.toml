@@ -1,7 +1,6 @@
 # Netlify Configuration for Smart Waste Detection
 [build]
   publish = "."
-  command = "echo 'Static site ready for deployment'"
 
 # Custom headers for security and performance
 [[headers]]
