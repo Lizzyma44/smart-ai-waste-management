@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Smart Waste Detection - Universal</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="AI-powered waste classification system - works on any computer with Chrome">
+    <meta name="theme-color" content="#667eea">
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+    
+    <!-- External Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Arduino Connection Status -->
+    <div id="arduinoStatus" class="arduino-status">
+        🔌 Arduino Disconnected
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading AI Models</div>
+            <div class="loading-details" id="loadingDetails">
+                Initializing TensorFlow.js for universal waste detection...
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Interface -->
+    <div id="mainInterface" class="main-container" style="display: none;">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-card">
+                <h1 class="header-title">🤖 Smart Waste Detection</h1>
+                <p class="header-subtitle">Universal AI-powered system - works on any computer!</p>
+            </div>
+        </div>
+
+        <!-- Camera Container -->
+        <div class="camera-container">
+            <video id="video" autoplay muted playsinline></video>
+            <canvas id="detectionCanvas" class="detection-overlay"></canvas>
+        </div>
+
+        <!-- Status Indicator -->
+        <div id="statusIndicator" class="status-indicator info">
+            Click "Start Camera" to begin waste detection
+        </div>
+
+        <!-- Auto Detection Indicator -->
+        <div id="autoIndicator" class="auto-indicator">
+            🔄 AUTO DETECTING...
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="controls-panel">
+            <button id="startBtn" class="control-button primary">🎥 Start Camera</button>
+            <button id="stopBtn" class="control-button danger" disabled>⏹️ Stop Camera</button>
+            <button id="detectBtn" class="control-button" disabled>🔍 Detect Waste</button>
+            
+            <div class="auto-toggle">
+                <span class="auto-toggle-label">Auto Detect</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="autoToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Arduino Controls -->
+            <div class="arduino-controls">
+                <button id="connectArduinoBtn" class="control-button">🔌 Connect Arduino</button>
+                <select id="baudRateSelect" class="control-select">
+                    <option value="9600">9600 baud</option>
+                    <option value="115200">115200 baud</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Information Panel -->
+        <div id="infoPanel" class="info-panel">
+            <div class="waste-category-display">
+                <div class="waste-category-large unknown" id="wasteCategoryLarge">
+                    READY
+                </div>
+            </div>
+            
+            <div class="info-details">
+                <div class="info-item">
+                    <div class="info-value" id="confidenceValue">--</div>
+                    <div class="info-label">Confidence</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-value" id="processingValue">--</div>
+                    <div class="info-label">Time (s)</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-value" id="totalCount">0</div>
+                    <div class="info-label">Total</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-value" id="accuracyValue">--</div>
+                    <div class="info-label">Session Avg</div>
+                </div>
+            </div>
+
+            <!-- Arduino Command Log -->
+            <div class="arduino-log">
+                <div class="log-header">Arduino Commands</div>
+                <div id="commandLog" class="command-log">
+                    No commands sent yet
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Instructions -->
+        <div class="help-panel">
+            <button id="helpBtn" class="help-button">❓ Help</button>
+            <div id="helpContent" class="help-content" style="display: none;">
+                <h3>🚀 Quick Start Guide</h3>
+                <ol>
+                    <li>Click "Start Camera" to access your webcam</li>
+                    <li>Connect Arduino via USB cable</li>
+                    <li>Click "Connect Arduino" and select the port</li>
+                    <li>Point camera at waste items</li>
+                    <li>Click "Detect Waste" or enable "Auto Detect"</li>
+                    <li>Watch Arduino receive commands: 'w' = wet waste, 'd' = dry waste</li>
+                </ol>
+                <p><strong>Requirements:</strong> Chrome browser, webcam, Arduino with USB</p>
+                <p><strong>Works on:</strong> Windows, Mac, Linux, ChromeOS - any computer!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script type="module" src="js/app.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(registration => console.log('SW registered'))
+                .catch(error => console.log('SW registration failed'));
+        }
+    </script>
+</body>
+</html>

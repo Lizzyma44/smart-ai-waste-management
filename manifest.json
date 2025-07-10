@@ -1,0 +1,74 @@
+{
+  "name": "Smart Waste Detection",
+  "short_name": "WasteDetector",
+  "description": "AI-powered waste classification system that works on any computer with Chrome browser",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#667eea",
+  "orientation": "any",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["utilities", "productivity", "education"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><text y='160' font-size='160' fill='%23667eea'>🤖</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><text y='430' font-size='430' fill='%23667eea'>🤖</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Quick Detection",
+      "short_name": "Detect",
+      "description": "Start camera and detect waste immediately",
+      "url": "/?action=quick-detect",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80' fill='%234CAF50'>🔍</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Connect Arduino",
+      "short_name": "Arduino",
+      "description": "Connect to Arduino device",
+      "url": "/?action=connect-arduino",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80' fill='%23FF9800'>🔌</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'><rect width='1280' height='720' fill='%23667eea'/><text x='640' y='360' text-anchor='middle' font-size='48' fill='white'>Smart Waste Detection Interface</text></svg>",
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "Main interface with camera and controls"
+    }
+  ],
+  "features": [
+    "camera",
+    "serial",
+    "ai-detection",
+    "offline-support"
+  ],
+  "edge_side_include": false,
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "iarc_rating_id": ""
+}
