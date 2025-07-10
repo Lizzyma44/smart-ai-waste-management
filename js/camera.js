@@ -25,14 +25,27 @@ export class CameraManager {
     
     async start() {
         try {
+            // Detect mobile device
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            
+            // Mobile-optimized constraints
             const constraints = {
                 video: {
-                    width: { ideal: 1920, min: 640 },
-                    height: { ideal: 1080, min: 480 },
-                    facingMode: 'environment' // Prefer back camera on mobile
+                    width: isMobile ? { ideal: 1280, min: 480 } : { ideal: 1920, min: 640 },
+                    height: isMobile ? { ideal: 720, min: 360 } : { ideal: 1080, min: 480 },
+                    facingMode: 'environment', // Prefer back camera on mobile
+                    frameRate: isMobile ? { ideal: 15, max: 30 } : { ideal: 30 }
                 },
                 audio: false
             };
+            
+            // iOS specific handling
+            if (isIOS) {
+                // iOS Safari requires user interaction before camera access
+                constraints.video.width = { ideal: 1280, max: 1920 };
+                constraints.video.height = { ideal: 720, max: 1080 };
+            }
             
             this.stream = await navigator.mediaDevices.getUserMedia(constraints);
             this.video.srcObject = this.stream;
@@ -49,28 +62,38 @@ export class CameraManager {
         } catch (error) {
             console.error('Camera access error:', error);
             
-            // Try with reduced constraints if initial attempt fails
-            try {
-                const fallbackConstraints = {
-                    video: { width: 640, height: 480 },
-                    audio: false
-                };
-                
-                this.stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-                this.video.srcObject = this.stream;
-                
-                return new Promise((resolve) => {
-                    this.video.onloadedmetadata = () => {
-                        this.video.play();
-                        this.active = true;
-                        this.updateCanvasSize();
-                        resolve(true);
-                    };
-                });
-                
-            } catch (fallbackError) {
-                console.error('Fallback camera access failed:', fallbackError);
-                return false;
+            // Try progressive fallback for mobile compatibility
+            const fallbackOptions = [
+                // Basic mobile constraints
+                { video: { width: 640, height: 480, facingMode: 'environment' }, audio: false },
+                // iOS compatible constraints
+                { video: { width: 480, height: 360 }, audio: false },
+                // Minimal constraints for older devices
+                { video: true, audio: false }
+            ];
+            
+            for (let i = 0; i < fallbackOptions.length; i++) {
+                try {
+                    console.log(`Trying fallback option ${i + 1}:`, fallbackOptions[i]);
+                    this.stream = await navigator.mediaDevices.getUserMedia(fallbackOptions[i]);
+                    this.video.srcObject = this.stream;
+                    
+                    return new Promise((resolve) => {
+                        this.video.onloadedmetadata = () => {
+                            this.video.play();
+                            this.active = true;
+                            this.updateCanvasSize();
+                            resolve(true);
+                        };
+                    });
+                    
+                } catch (fallbackError) {
+                    console.error(`Fallback option ${i + 1} failed:`, fallbackError);
+                    if (i === fallbackOptions.length - 1) {
+                        this.showMobileErrorMessage(error);
+                        return false;
+                    }
+                }
             }
         }
     }
@@ -207,5 +230,67 @@ export class CameraManager {
         if (!videoTrack) return null;
         
         return videoTrack.getSettings();
+    }
+    
+    // Mobile-specific error handling
+    showMobileErrorMessage(error) {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        
+        let message = 'Camera access failed. ';
+        
+        if (error.name === 'NotAllowedError') {
+            if (isIOS) {
+                message += 'On iOS: Go to Settings > Safari > Camera, and allow camera access. Then refresh this page.';
+            } else if (isMobile) {
+                message += 'Please allow camera permission in your browser settings and refresh the page.';
+            } else {
+                message += 'Please allow camera permission and refresh the page.';
+            }
+        } else if (error.name === 'NotFoundError') {
+            message += 'No camera found. Please ensure your device has a camera.';
+        } else if (error.name === 'NotSupportedError') {
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                message += 'Camera requires HTTPS. Please use the HTTPS version of this site.';
+            } else {
+                message += 'Camera not supported in this browser. Try Chrome or Safari.';
+            }
+        } else {
+            message += `Error: ${error.message}`;
+        }
+        
+        // Show error in UI
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'mobile-error-message';
+        errorDiv.innerHTML = `
+            <div class="error-content">
+                <h3>📱 Camera Issue</h3>
+                <p>${message}</p>
+                <button onclick="this.parentElement.parentElement.remove(); window.location.reload();">Try Again</button>
+            </div>
+        `;
+        document.body.appendChild(errorDiv);
+    }
+    
+    // Check if device has camera capabilities
+    static async checkCameraSupport() {
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoInputs = devices.filter(device => device.kind === 'videoinput');
+            return {
+                supported: !!navigator.mediaDevices?.getUserMedia,
+                hasCamera: videoInputs.length > 0,
+                cameraCount: videoInputs.length,
+                isSecureContext: window.isSecureContext
+            };
+        } catch (error) {
+            return {
+                supported: false,
+                hasCamera: false,
+                cameraCount: 0,
+                isSecureContext: window.isSecureContext,
+                error: error.message
+            };
+        }
     }
 }
