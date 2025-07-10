@@ -4,6 +4,9 @@ export class AIDetector {
         this.mobileNetModel = null;
         this.cocoSsdModel = null;
         this.isLoaded = false;
+        this.loadAttempts = 0;
+        this.maxRetries = 3;
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         // Waste classification mapping
         this.wasteClassification = {
@@ -21,34 +24,78 @@ export class AIDetector {
         };
     }
     
-    async loadMobileNet() {
+    async loadMobileNet(retryCount = 0) {
         try {
-            console.log('Loading MobileNet model...');
-            this.mobileNetModel = await mobilenet.load();
+            console.log(`Loading MobileNet model... (attempt ${retryCount + 1}/${this.maxRetries})`);
+            
+            // Add timeout for mobile devices
+            const timeoutMs = this.isMobile ? 30000 : 20000;
+            const loadPromise = mobilenet.load();
+            
+            this.mobileNetModel = await Promise.race([
+                loadPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('MobileNet loading timeout')), timeoutMs)
+                )
+            ]);
+            
             console.log('✅ MobileNet loaded successfully');
             return true;
+            
         } catch (error) {
-            console.error('Failed to load MobileNet:', error);
-            throw error;
+            console.error(`Failed to load MobileNet (attempt ${retryCount + 1}):`, error);
+            
+            if (retryCount < this.maxRetries - 1) {
+                console.log(`Retrying MobileNet load in 2 seconds...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return this.loadMobileNet(retryCount + 1);
+            }
+            
+            throw new Error(`Failed to load MobileNet after ${this.maxRetries} attempts: ${error.message}`);
         }
     }
     
-    async loadCocoSSD() {
+    async loadCocoSSD(retryCount = 0) {
         try {
-            console.log('Loading COCO-SSD model...');
-            this.cocoSsdModel = await cocoSsd.load();
+            console.log(`Loading COCO-SSD model... (attempt ${retryCount + 1}/${this.maxRetries})`);
+            
+            // Add timeout for mobile devices
+            const timeoutMs = this.isMobile ? 45000 : 30000;
+            
+            // Mobile-optimized loading with smaller model if available
+            const modelConfig = this.isMobile ? 
+                { base: 'mobilenet_v1' } : 
+                { base: 'mobilenet_v2' };
+                
+            const loadPromise = cocoSsd.load(modelConfig);
+            
+            this.cocoSsdModel = await Promise.race([
+                loadPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('COCO-SSD loading timeout')), timeoutMs)
+                )
+            ]);
+            
             console.log('✅ COCO-SSD loaded successfully');
             this.isLoaded = true;
             return true;
+            
         } catch (error) {
-            console.error('Failed to load COCO-SSD:', error);
-            throw error;
+            console.error(`Failed to load COCO-SSD (attempt ${retryCount + 1}):`, error);
+            
+            if (retryCount < this.maxRetries - 1) {
+                console.log(`Retrying COCO-SSD load in 3 seconds...`);
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                return this.loadCocoSSD(retryCount + 1);
+            }
+            
+            throw new Error(`Failed to load COCO-SSD after ${this.maxRetries} attempts: ${error.message}`);
         }
     }
     
     async classifyWaste(imageElement) {
         if (!this.isLoaded) {
-            throw new Error('AI models not loaded');
+            throw new Error('AI models not loaded. Please refresh the page to retry loading.');
         }
         
         const startTime = performance.now();
@@ -70,14 +117,76 @@ export class AIDetector {
             
         } catch (error) {
             console.error('Classification error:', error);
-            throw error;
+            
+            // Provide fallback basic classification
+            if (error.message.includes('not loaded')) {
+                throw error;
+            }
+            
+            // Return basic fallback result for processing errors
+            return {
+                wasteCategory: 'UNKNOWN',
+                object: 'unidentified',
+                confidence: 0,
+                source: 'fallback',
+                processingTime: 0
+            };
+        }
+    }
+    
+    // Add method to check TensorFlow.js availability
+    static async checkTensorFlowSupport() {
+        try {
+            if (typeof tf === 'undefined') {
+                throw new Error('TensorFlow.js not loaded');
+            }
+            
+            if (typeof mobilenet === 'undefined') {
+                throw new Error('MobileNet not loaded');
+            }
+            
+            if (typeof cocoSsd === 'undefined') {
+                throw new Error('COCO-SSD not loaded');
+            }
+            
+            // Test WebGL support
+            const webglSupported = tf.ENV.getBool('WEBGL_RENDER_FLOAT32_CAPABLE');
+            
+            return {
+                supported: true,
+                webgl: webglSupported,
+                backend: tf.getBackend()
+            };
+            
+        } catch (error) {
+            return {
+                supported: false,
+                error: error.message,
+                webgl: false,
+                backend: 'none'
+            };
         }
     }
     
     async classifyWithMobileNet(imageElement) {
         try {
-            const predictions = await this.mobileNetModel.classify(imageElement);
-            return predictions;
+            if (!this.mobileNetModel) {
+                throw new Error('MobileNet model not loaded');
+            }
+            
+            // Add timeout for mobile processing
+            const timeoutMs = this.isMobile ? 10000 : 5000;
+            const classifyPromise = this.mobileNetModel.classify(imageElement);
+            
+            const predictions = await Promise.race([
+                classifyPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('MobileNet classification timeout')), timeoutMs)
+                )
+            ]);
+            
+            return predictions || [];
+            
         } catch (error) {
             console.error('MobileNet classification error:', error);
             return [];
@@ -86,8 +195,23 @@ export class AIDetector {
     
     async detectWithCocoSSD(imageElement) {
         try {
-            const predictions = await this.cocoSsdModel.detect(imageElement);
-            return predictions;
+            if (!this.cocoSsdModel) {
+                throw new Error('COCO-SSD model not loaded');
+            }
+            
+            // Add timeout for mobile processing
+            const timeoutMs = this.isMobile ? 15000 : 10000;
+            const detectPromise = this.cocoSsdModel.detect(imageElement);
+            
+            const predictions = await Promise.race([
+                detectPromise,
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('COCO-SSD detection timeout')), timeoutMs)
+                )
+            ]);
+            
+            return predictions || [];
+            
         } catch (error) {
             console.error('COCO-SSD detection error:', error);
             return [];
