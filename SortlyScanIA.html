@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Waste Detection - Arduino Serial</title>
+    <title>Clasificador de basura</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.2/dist/coco-ssd.min.js"></script>
@@ -19,7 +19,7 @@
             <div class="loading-spinner"></div>
             <div class="loading-text">Cargando modelo de IA</div>
             <div class="loading-details" id="loadingDetails">
-                Initializing TensorFlow.js and MobileNet for Arduino integration...
+                Inicializando TensorFlow.js y MobileNet para integracion de Arduino...
             </div>
         </div>
     </div>
@@ -27,8 +27,7 @@
     <div id="mainInterface" class="main-container" style="display: none;">
         <div class="header">
             <div class="header-card">
-                <h1 class="header-title">  🤖 Scaner SortlyScan  </h1>
-                <p class="header-subtitle">Arduino Serial Communication Enabled</p>
+                <h1 class="header-title">Escaner de SortlyScan</h1>
             </div>
         </div>
 
@@ -42,14 +41,14 @@
         </div>
 
         <div id="autoIndicator" class="auto-indicator">
-            🔄 AUTO DETECTING...
+            🔄 AUTODETECTANDO...
         </div>
 
         <div class="controls-panel">
-            <button id="connectArduino" class="control-button arduino">🔌 Connect Arduino</button>
-            <button id="startBtn" class="control-button primary">🎥 Start</button>
-            <button id="stopBtn" class="control-button danger" disabled>⏹️ Stop</button>
-            <button id="detectBtn" class="control-button" disabled>🔍 Detect</button>
+            <button id="connectArduino" class="control-button arduino">🔌 Conectar Arduino</button>
+            <button id="startBtn" class="control-button primary">🎥 Iniciar</button>
+            <button id="stopBtn" class="control-button danger" disabled>⏹️ Parar</button>
+            <button id="detectBtn" class="control-button" disabled>🔍 Detectar</button>
             <div class="auto-toggle">
                 <span class="auto-toggle-label">Auto</span>
                 <label class="toggle-switch">
@@ -62,18 +61,18 @@
         <div id="infoPanel" class="info-panel">
             <div class="waste-category-display">
                 <div class="waste-category-large unknown" id="wasteCategoryLarge">
-                    READY
+                    ¡Listo!
                 </div>
             </div>
            
             <div class="info-details">
                 <div class="info-item">
                     <div class="info-value" id="confidenceValue">--</div>
-                    <div class="info-label">Confidence</div>
+                    <div class="info-label">Viabilidad</div>
                 </div>
                 <div class="info-item">
                     <div class="info-value" id="processingValue">--</div>
-                    <div class="info-label">Time (s)</div>
+                    <div class="info-label">Tiempo (s)</div>
                 </div>
                 <div class="info-item">
                     <div class="info-value" id="totalCount">0</div>
@@ -81,40 +80,40 @@
                 </div>
                 <div class="info-item">
                     <div class="info-value" id="accuracyValue">--</div>
-                    <div class="info-label">Session Avg</div>
+                    <div class="info-label">Promedio</div>
                 </div>
             </div>
         </div>
 
         <div class="serial-panel">
-            <h3 class="serial-title">📡 Serial Monitor</h3>
+            <h3 class="serial-title">📡 Monitor Serial</h3>
             <div id="serialLog" class="serial-log">
-                > Arduino Serial Monitor<br>
-                > Waiting for connection...<br>
+                > Monitor Serial de arduino<br>
+                > Esperando conexión...<br>
             </div>
             <div class="serial-commands">
                 <div class="command-item">
-                    <span>Wet Waste:</span>
+                    <span>Orgánica:</span>
                     <span class="command-code">'w'</span>
                 </div>
                 <div class="command-item">
-                    <span>Paper Waste:</span>
+                    <span>Papel:</span>
                     <span class="command-code">'p'</span>
                 </div>
                 <div class="command-item">
-                    <span>Plastic Waste:</span>
+                    <span>Plástico:</span>
                     <span class="command-code">'l'</span>
                 </div>
                 <div class="command-item">
-                    <span>Glass Waste:</span>
+                    <span>Vidrio:</span>
                     <span class="command-code">'g'</span>
                 </div>
                 <div class="command-item">
-                    <span>Electronic Waste:</span>
+                    <span>Electrónico:</span>
                     <span class="command-code">'e'</span>
                 </div>
                 <div class="command-item">
-                    <span>Can Waste:</span>
+                    <span>Aluminio:</span>
                     <span class="command-code">'c'</span>
                 </div>
             </div>
