@@ -18,7 +18,7 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #7fb628 0%, #acdc5f 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             overflow: hidden;
             height: 100vh;
             position: relative;
@@ -282,7 +282,6 @@
             top: 30px;
             right: 30px;
             padding: 20px;
-            width: 350px;
             background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(20px);
             border-radius: 20px;
@@ -397,7 +396,7 @@
             position: absolute;
             bottom: 30px;
             right: 30px;
-            width: 350px;
+            width: 280px;
             padding: 20px;
             background: rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(20px);
@@ -421,8 +420,7 @@
             border-radius: 10px;
             font-family: 'Courier New', monospace;
             font-size: 0.8em;
-            width: 300px;
-            height: 220px;
+            height: 120px;
             overflow-y: auto;
             margin-bottom: 15px;
             border: 1px solid rgba(255, 255, 255, 0.2);
@@ -598,6 +596,10 @@
     </style>
 </head>
 <body>
+    <div id="arduinoStatus" class="arduino-status">
+        🔌 Arduino Desconectado
+    </div>
+
     <div id="loadingScreen" class="loading-screen">
         <div class="loading-container">
             <div class="loading-spinner"></div>
@@ -611,7 +613,8 @@
     <div id="mainInterface" class="main-container" style="display: none;">
         <div class="header">
             <div class="header-card">
-                <h1 class="header-title">Escaner de SortlyScan</h1>
+                <h1 class="header-title">🤖 Smart Waste Detection</h1>
+                <p class="header-subtitle">Arduino Serial Communication Enabled</p>
             </div>
         </div>
 
@@ -625,13 +628,14 @@
         </div>
 
         <div id="autoIndicator" class="auto-indicator">
-            Autodectetando...
+            🔄 AUTO DETECTING...
         </div>
 
         <div class="controls-panel">
-            <button id="startBtn" class="control-button primary">Iniciar</button>
-            <button id="stopBtn" class="control-button danger" disabled>Parar</button>
-            <button id="detectBtn" class="control-button" disabled>Detectar</button>
+            <button id="connectArduino" class="control-button arduino">🔌 Connect Arduino</button>
+            <button id="startBtn" class="control-button primary">🎥 Start</button>
+            <button id="stopBtn" class="control-button danger" disabled>⏹️ Stop</button>
+            <button id="detectBtn" class="control-button" disabled>🔍 Detect</button>
             
             <div class="auto-toggle">
                 <span class="auto-toggle-label">Auto</span>
@@ -645,18 +649,18 @@
         <div id="infoPanel" class="info-panel">
             <div class="waste-category-display">
                 <div class="waste-category-large unknown" id="wasteCategoryLarge">
-                    ¡LISTO!
+                    READY
                 </div>
             </div>
             
             <div class="info-details">
                 <div class="info-item">
                     <div class="info-value" id="confidenceValue">--</div>
-                    <div class="info-label">Viable</div>
+                    <div class="info-label">Confidence</div>
                 </div>
                 <div class="info-item">
                     <div class="info-value" id="processingValue">--</div>
-                    <div class="info-label">Tiempo (s)</div>
+                    <div class="info-label">Time (s)</div>
                 </div>
                 <div class="info-item">
                     <div class="info-value" id="totalCount">0</div>
@@ -664,46 +668,50 @@
                 </div>
                 <div class="info-item">
                     <div class="info-value" id="accuracyValue">--</div>
-                    <div class="info-label">Porcentaje</div>
+                    <div class="info-label">Session Avg</div>
                 </div>
             </div>
         </div>
 
         <div class="serial-panel">
-            <h3 class="serial-title">Monitor Sensorial</h3>
+            <h3 class="serial-title">📡 Serial Monitor</h3>
             <div id="serialLog" class="serial-log">
-                > Monitor sensorial de arduino<br>
-                > Esperando conexion...<br>
+                > Arduino Serial Monitor<br>
+                > Waiting for connection...<br>
             </div>
             <div class="serial-commands">
                 <div class="command-item">
-                    <span>Organica:</span>
+                    <span>Wet Waste:</span>
                     <span class="command-code">'w'</span>
                 </div>
                 <div class="command-item">
-                    <span>Papel:</span>
+                    <span>Paper Waste:</span>
                     <span class="command-code">'p'</span>
                 </div>
                 <div class="command-item">
-                    <span>Plastico:</span>
+                    <span>Plastic Waste:</span>
                     <span class="command-code">'l'</span>
                 </div>
                 <div class="command-item">
-                    <span>Vidrio:</span>
+                    <span>Glass Waste:</span>
                     <span class="command-code">'g'</span>
                 </div>
                 <div class="command-item">
-                    <span>Electronico:</span>
+                    <span>Electronic Waste:</span>
                     <span class="command-code">'e'</span>
                 </div>
                 <div class="command-item">
-                    <span>Aluminio:</span>
+                    <span>Can Waste:</span>
                     <span class="command-code">'c'</span>
                 </div>
             </div>
         </div>
 
-        
+        <div class="navigation-links">
+            <a href="complete_dashboard.html" class="nav-link">
+                📊 Dashboard
+            </a>
+        </div>
     </div>
 
     <script>
